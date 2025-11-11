@@ -2,11 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 
-const app = express();
+const Book = require('./models/Book');
 
 mongoose.connect(process.env.MONGO_URI)
 .then(() => console.log('Connexion à MongoDB réussie !'))
 .catch((err) => console.log('Connexion à MongoDB échouée !'));
+
+const app = express();
 
 app.use(express.json());
 
@@ -17,23 +19,38 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/api/books', (req, res) => {
-  const books = [
-    {
-      userId: 'Martin',
-      title: 'Harry Potter',
-      author: 'J.K. Rowling',
-      imageUrl: "URL de l'image",
-      year: 1997,
-      genre: 'SF',
-      ratings: [
-        { userId: 'Martin', grade: 5 }
-      ],
-      averageRating: 5
-    }
-  ];
+app.post('/api/books', (req, res, next) => {
+  delete req.body._id;
+  const book = new Book({
+    ...req.body
+  });
+  book.save()
+    .then(() => res.status(201).json({ message: 'Objet enregistré !'}))
+    .catch(error => res.status(400).json({ error }));
+});
 
-  res.status(200).json(books);
+app.get('/api/books/:id', (req, res, next) => {
+  Book.findOne({ _id: req.params.id })
+    .then(book => res.status(200).json(book))
+    .catch(error => res.status(404).json({ error }));
+});
+
+app.put('/api/books/:id', (req, res, next) => {
+  Book.updateOne({ _id: req.params.id }, { ...req.body, _id: req.params.id })
+    .then(() => res.status(200).json({ message: 'Objet modifié !'}))
+    .catch(error => res.status(400).json({ error }));
+});
+
+app.delete('/api/books/:id', (req, res, next) => {
+  Book.deleteOne({ _id: req.params.id })
+    .then(() => res.status(200).json({ message: 'Objet supprimé !'}))
+    .catch(error => res.status(400).json({ error }));
+});
+
+app.get('/api/books', (req, res) => {
+  Book.find()
+    .then(books => res.status(200).json(books))
+    .catch(error => res.status(400).json({ error }));
 });
 
 module.exports = app;
