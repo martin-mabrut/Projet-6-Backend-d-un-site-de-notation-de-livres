@@ -26,7 +26,7 @@ exports.modifyBook = (req, res, next) => {
    Book.findOne({_id: req.params.id})
        .then((book) => {
            if (book.userId != req.auth.userId) {
-               res.status(401).json({ message : 'Not authorized'});
+               res.status(403).json({ message: 'Unauthorized request' });
            } else {
                Book.updateOne({ _id: req.params.id}, { ...bookObject, _id: req.params.id})
                .then(() => res.status(200).json({message : 'Objet modifié!'}))
@@ -42,7 +42,7 @@ exports.deleteBook = (req, res, next) => {
    Book.findOne({ _id: req.params.id})
        .then(book => {
            if (book.userId != req.auth.userId) {
-               res.status(401).json({message: 'Not authorized'});
+               res.status(403).json({message: 'unauthorized request'});
            } else {
                const filename = book.imageUrl.split('/images/')[1];
                fs.unlink(`images/${filename}`, () => {
@@ -68,3 +68,52 @@ exports.getAllBooks = (req, res, next) => {
     .then(books => res.status(200).json(books))
     .catch(error => res.status(400).json({ error }));
 }
+
+exports.getBestRatedBooks = (req, res, next) => {
+  // On cherche tous les livres dans la collection
+  Book.find()
+    // On les trie par ordre décroissant selon la note moyenne (du plus haut au plus bas)
+    .sort({ averageRating: -1 })
+    // On limite le résultat à 3 livres maximum
+    .limit(3)
+    // Si tout se passe bien, on renvoie les livres trouvés
+    .then(bestRatedBooks => {
+      res.status(200).json(bestRatedBooks);
+    })
+    // En cas d’erreur (ex : problème de connexion à la base), on renvoie une erreur 500
+    .catch(error => {
+      res.status(500).json({ error });
+    });
+};
+
+exports.rateBook = (req, res, next) => {
+  const bookId = req.params.id;
+  const userId = req.auth.userId; // 🔐 récupéré du token, donc fiable
+  const rating = req.body.rating;
+
+  if (rating < 0 || rating > 5) {
+    return res.status(400).json({ message: 'La note doit être comprise entre 0 et 5.' });
+  }
+
+  Book.findOne({ _id: bookId })
+    .then(book => {
+      if (!book) {
+        return res.status(404).json({ message: 'Livre introuvable.' });
+      }
+
+      const alreadyRated = book.ratings.find(r => r.userId === userId);
+      if (alreadyRated) {
+        return res.status(400).json({ message: 'Vous avez déjà noté ce livre.' });
+      }
+
+      book.ratings.push({ userId: userId, grade: rating });
+
+      const total = book.ratings.reduce((acc, curr) => acc + curr.grade, 0);
+      book.averageRating = total / book.ratings.length;
+
+      book.save()
+        .then(updatedBook => res.status(200).json(updatedBook))
+        .catch(error => res.status(400).json({ error }));
+    })
+    .catch(error => res.status(500).json({ error }));
+};
