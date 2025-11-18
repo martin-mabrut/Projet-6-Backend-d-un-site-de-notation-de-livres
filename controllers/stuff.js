@@ -17,25 +17,48 @@ exports.createBook = (req, res, next) => {
 };
 
 exports.modifyBook = (req, res, next) => {
-   const bookObject = req.file ? {
-       ...JSON.parse(req.body.book),
-       imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
-   } : { ...req.body };
- 
-   delete bookObject._userId;
-   Book.findOne({_id: req.params.id})
-       .then((book) => {
-           if (book.userId != req.auth.userId) {
-               res.status(403).json({ message: 'Unauthorized request' });
-           } else {
-               Book.updateOne({ _id: req.params.id}, { ...bookObject, _id: req.params.id})
-               .then(() => res.status(200).json({message : 'Objet modifié!'}))
-               .catch(error => res.status(401).json({ error }));
-           }
-       })
-       .catch((error) => {
-           res.status(400).json({ error });
-       });
+  const bookObject = req.file
+    ? {
+        ...JSON.parse(req.body.book),
+        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
+      }
+    : { ...req.body };
+
+  delete bookObject._userId;
+
+  Book.findOne({ _id: req.params.id })
+    .then((book) => {
+      if (book.userId != req.auth.userId) {
+        return res.status(403).json({ message: 'Unauthorized request' });
+      }
+
+      const applyUpdate = () => {
+        Book.updateOne(
+          { _id: req.params.id },
+          { ...bookObject, _id: req.params.id }
+        )
+          .then(() => res.status(200).json({ message: 'Objet modifié!' }))
+          .catch(error => res.status(401).json({ error }));
+      };
+
+      // 👉 S'il n'y a PAS de nouvelle image : on met juste à jour le livre
+      if (!req.file) {
+        return applyUpdate();
+      }
+
+      // 👉 S'il Y A une nouvelle image : on supprime l'ancienne avant de mettre à jour
+      const oldFilename = book.imageUrl.split('/images/')[1];
+      fs.unlink(`images/${oldFilename}`, (err) => {
+        if (err) {
+          console.error('Erreur suppression ancienne image :', err);
+          // même si la suppression échoue, on met à jour le livre
+        }
+        applyUpdate();
+      });
+    })
+    .catch((error) => {
+      res.status(400).json({ error });
+    });
 };
 
 exports.deleteBook = (req, res, next) => {
@@ -88,7 +111,7 @@ exports.getBestRatedBooks = (req, res, next) => {
 
 exports.rateBook = (req, res, next) => {
   const bookId = req.params.id;
-  const userId = req.auth.userId; // 🔐 récupéré du token, donc fiable
+  const userId = req.auth.userId; // récupéré du token, donc fiable
   const rating = req.body.rating;
 
   if (rating < 0 || rating > 5) {
@@ -109,7 +132,7 @@ exports.rateBook = (req, res, next) => {
       book.ratings.push({ userId: userId, grade: rating });
 
       const total = book.ratings.reduce((acc, curr) => acc + curr.grade, 0);
-      book.averageRating = total / book.ratings.length;
+      book.averageRating = Number((total / book.ratings.length).toFixed(1));
 
       book.save()
         .then(updatedBook => res.status(200).json(updatedBook))
