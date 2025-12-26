@@ -5,12 +5,19 @@ const multer = require('../middleware/multer-config');
 
 const stuffCtrl = require('../controllers/stuff');
 
-router.post('/', auth, multer, stuffCtrl.createBook);
-router.get('/bestrating', stuffCtrl.getBestRatedBooks);
-router.post('/:id/rating', auth, stuffCtrl.rateBook);
-router.get('/:id', stuffCtrl.getOneBook);
-router.put('/:id', auth, multer, stuffCtrl.modifyBook);
-router.delete('/:id', auth, stuffCtrl.deleteBook);
+// GET
 router.get('/', stuffCtrl.getAllBooks);
+router.get('/bestrating', stuffCtrl.getBestRatedBooks);
+router.get('/:id', stuffCtrl.getOneBook);
+
+// POST
+router.post('/', auth, multer, stuffCtrl.createBook);
+router.post('/:id/rating', auth, stuffCtrl.rateBook);
+
+// PUT
+router.put('/:id', auth, multer, stuffCtrl.modifyBook);
+
+// DELETE
+router.delete('/:id', auth, stuffCtrl.deleteBook);
 
 module.exports = router;
