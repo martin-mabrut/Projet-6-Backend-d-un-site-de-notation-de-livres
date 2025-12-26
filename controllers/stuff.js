@@ -41,12 +41,12 @@ exports.modifyBook = (req, res, next) => {
           .catch(error => res.status(401).json({ error }));
       };
 
-      // 👉 S'il n'y a PAS de nouvelle image : on met juste à jour le livre
+      // S'il n'y a PAS de nouvelle image : on met à jour le livre
       if (!req.file) {
         return applyUpdate();
       }
 
-      // 👉 S'il Y A une nouvelle image : on supprime l'ancienne avant de mettre à jour
+      // S'il Y A une nouvelle image : on supprime l'ancienne avant de mettre à jour
       const oldFilename = book.imageUrl.split('/images/')[1];
       fs.unlink(`images/${oldFilename}`, (err) => {
         if (err) {
